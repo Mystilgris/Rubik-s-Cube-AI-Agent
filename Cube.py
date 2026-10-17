@@ -1,3 +1,6 @@
+import random
+
+
 class RubiksCube:
 
     # Face colors
@@ -108,6 +111,31 @@ class RubiksCube:
         for _ in range(repetitions):
             self._turn_clockwise(face)
 
+    def is_solved(self):
+        return all(
+            all(sticker == self.FACE_COLORS[face] for row in grid for sticker in row)
+            for face, grid in self.faces.items()
+        )
+
+    def scramble(self, length=20, rng=None):
+        """Apply random turns and return their notation (not a uniform random state)."""
+        if not isinstance(length, int) or isinstance(length, bool) or length < 0:
+            raise ValueError("Scramble length must be a nonnegative integer.")
+        rng = rng or random
+        moves = []
+        for _ in range(length):
+            choices = [face for face in self.FACE_LETTERS
+                       if not moves or face != moves[-1][0]]
+            move = rng.choice(choices) + rng.choice(("", "'", "2"))
+            self.turn(move)
+            moves.append(move)
+        return moves
+
+    def solve(self):
+        """Apply CFOP and return an ordered mapping of stage names to moves."""
+        from cfop import solve
+        return solve(self)
+
     @staticmethod
     def _color_sticker(color):
         ansi_colors = {
@@ -164,15 +192,26 @@ def main():
     cube = RubiksCube()
     cube.display()
     while True:
-        move = input("Move ('U', 'D', 'L', 'R', 'F', 'B'), can do double by adding 2 i.e. 'R2' or do prime i.e. 'R', 'show' to display cube, or 'quit': ").strip()
+        move = input("Move (R, R', R2, etc.), scramble [length], solve, show, or quit: ").strip()
         if move.lower() == "quit":
             break
         if move.lower() == "show":
             cube.display()
+            continue
         try:
-            cube.turn(move)
+            command = move.lower().split()
+            if command and command[0] == "scramble":
+                if len(command) > 2:
+                    raise ValueError("Usage: scramble [length]")
+                length = int(command[1]) if len(command) == 2 else 20
+                print("Scramble:", " ".join(cube.scramble(length)))
+            elif move.lower() == "solve":
+                for stage, moves in cube.solve().items():
+                    print(f"{stage}: {' '.join(moves) or '(already complete)'}")
+            else:
+                cube.turn(move)
             cube.display()
-        except ValueError as e:
+        except (ValueError, RuntimeError) as e:
             print(e)
 
 if __name__ == "__main__":
